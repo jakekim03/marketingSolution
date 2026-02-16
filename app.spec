@@ -63,7 +63,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='법인영업솔루션',
+    name='MarketingSolution',
     debug=False,
     bootloader_ignore_signatures=False,
     strip=False,
@@ -84,5 +84,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='법인영업솔루션',
+    name='MarketingSolution',
 )

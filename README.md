@@ -29,7 +29,7 @@ git push -u origin main
 | **명령 프롬프트에서 실행** | Win+R → `cmd` 입력 → Enter 후, `cd /d "프로젝트폴더경로"` 입력하고 `setup_and_build.bat` 또는 `build.bat` 입력. |
 
 - **파이썬을 모르는 사람**은 **setup_and_build.bat**만 더블클릭하면 됩니다. (Python 자동 다운로드 후 빌드)
-- 끝나면 **`dist\법인영업솔루션`** 폴더가 생깁니다.
+- 끝나면 **`dist\MarketingSolution`** 폴더가 생깁니다.
 
 ### 3) ZIP 만들고 공유하기
 
@@ -38,17 +38,17 @@ git push -u origin main
 1. GitHub 저장소 페이지 → **Releases** → **Create a new release**
 2. 태그 예: `v1.0` 입력 후 **Publish release**
 3. 아래 **Assets**에서 **Attach binaries** 클릭
-4. **`dist\법인영업솔루션` 폴더 전체를 ZIP으로 압축**한 파일(예: `법인영업솔루션_윈도우.zip`)을 올립니다.
+4. **`dist\MarketingSolution` 폴더 전체를 ZIP으로 압축**한 파일(예: `MarketingSolution_윈도우.zip`)을 올립니다.
 5. Release 저장 후 **Release 페이지 주소**를 사용자에게 보냅니다.  
    예: `https://github.com/본인아이디/저장소이름/releases/tag/v1.0`
 
 **방법 B – 직접 전달**
 
-- `dist\법인영업솔루션` 폴더를 ZIP으로 압축해 이메일·카톡·드라이브로 전달합니다.
+- `dist\MarketingSolution` 폴더를 ZIP으로 압축해 이메일·카톡·드라이브로 전달합니다.
 
 ### 4) 사용자에게 안내할 말
 
-- **"아래 링크에서 ZIP 파일 받아서, 압축 풀고, 폴더 안의 법인영업솔루션.exe 더블클릭해서 쓰세요."**
+- **"아래 링크에서 ZIP 파일 받아서, 압축 풀고, 폴더 안의 MarketingSolution.exe 더블클릭해서 쓰세요."**
 - 자세한 설명이 필요하면 **`사용자_안내.md`** 내용을 복사해 보내거나, GitHub에 올려둔 **사용자_안내.md** 링크를 같이 보내면 됩니다.
 
 | 보낼 것 | 설명 |

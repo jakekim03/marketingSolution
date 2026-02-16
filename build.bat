@@ -33,13 +33,13 @@ if errorlevel 1 (
 )
 
 if exist "사용방법_배포용.txt" (
-  copy /Y "%~dp0사용방법_배포용.txt" "dist\법인영업솔루션\사용방법.txt" >nul 2>&1
+  copy /Y "%~dp0사용방법_배포용.txt" "dist\MarketingSolution\사용방법.txt" >nul 2>&1
 )
 
 echo.
 echo ====== Done ======
 echo.
-echo  Output folder: dist\법인영업솔루션
-echo  Zip that folder and send it. User runs 법인영업솔루션.exe
+echo  Output folder: dist\MarketingSolution
+echo  Zip that folder and send. User runs MarketingSolution.exe
 echo.
 pause

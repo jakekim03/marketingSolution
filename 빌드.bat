@@ -33,14 +33,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
-copy /Y "%~dp0사용방법_배포용.txt" "dist\법인영업솔루션\사용방법.txt" >nul 2>&1
+copy /Y "%~dp0사용방법_배포용.txt" "dist\MarketingSolution\사용방법.txt" >nul 2>&1
 echo.
 echo ====== 완료 ======
 echo.
-echo  [보낼 것]  dist\법인영업솔루션  폴더 전체를 ZIP으로 압축
-echo             (또는 폴더를 그대로 전달)
+echo  [보낼 것]  dist\MarketingSolution  폴더 전체를 ZIP으로 압축
 echo.
-echo  [받는 사람]  ZIP 압축 해제 후 "법인영업솔루션.exe" 더블클릭
-echo               (Python 등 설치 필요 없음)
+echo  [받는 사람]  ZIP 압축 해제 후 "MarketingSolution.exe" 더블클릭
 echo.
 pause

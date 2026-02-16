@@ -66,23 +66,31 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 4) PyInstaller + build
-Log "[5/5] Building exe..."
+Log "[5/5] Building exe (this may take a few minutes)..."
 & $PythonExe -m pip install pyinstaller -q
-& $PythonExe -m PyInstaller --noconfirm app.spec
+& $PythonExe -m PyInstaller --noconfirm app.spec 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Log "PyInstaller failed."
+    Log "PyInstaller failed. Check errors above."
     Read-Host "Press Enter to exit"
     exit 1
 }
 
-$distDir = Join-Path $ProjectRoot "dist\법인영업솔루션"
+$distDir = Join-Path $ProjectRoot "dist\MarketingSolution"
+if (-not (Test-Path $distDir)) {
+    Log "WARNING: dist\MarketingSolution not found. Listing dist folder:"
+    $distRoot = Join-Path $ProjectRoot "dist"
+    if (Test-Path $distRoot) { Get-ChildItem $distRoot } else { Log "dist folder does not exist." }
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
 if (Test-Path "사용방법_배포용.txt") {
     Copy-Item "사용방법_배포용.txt" (Join-Path $distDir "사용방법.txt") -Force -ErrorAction SilentlyContinue
 }
 
 Log ""
 Log "====== Done ======"
-Log "Output: dist\법인영업솔루션"
-Log "Zip that folder and send. User runs 법인영업솔루션.exe"
+Log "Output folder: dist\MarketingSolution"
+Log "Zip that folder and send. User runs MarketingSolution.exe"
 Log ""
 Read-Host "Press Enter to exit"
