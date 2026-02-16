@@ -4,6 +4,7 @@
 venv/
 env/
 .python_embed/
+.python_install/
 
 # Python
 __pycache__/

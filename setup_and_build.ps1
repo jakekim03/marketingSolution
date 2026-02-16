@@ -1,99 +1,62 @@
-# Python install + build - no manual Python install needed.
-# Run: Right-click -> Run with PowerShell, or: powershell -ExecutionPolicy Bypass -File setup_and_build.ps1
+# Python full installer + build. No embeddable, no get_pip - just official installer into project folder.
+# Run: setup_and_build.bat or: powershell -ExecutionPolicy Bypass -File setup_and_build.ps1
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 Set-Location $ProjectRoot
 
-$PythonEmbedUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip"
-$GetPipUrl = "https://bootstrap.pypa.io/get-pip.py"
-$EmbedDir = Join-Path $ProjectRoot ".python_embed"
-$PythonExe = Join-Path $EmbedDir "python.exe"
-$PipExe = Join-Path $EmbedDir "Scripts\pip.exe"
+$PythonInstallerUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe"
+$InstallDir = Join-Path $ProjectRoot ".python_install"
 
 function Log { param($msg) Write-Host $msg }
-function Fix-EmbedPth {
-    param($EmbedDir)
-    $pth = Get-ChildItem (Join-Path $EmbedDir "*.pth") -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($pth) {
-        $content = Get-Content $pth.FullName -Raw -Encoding UTF8
-        $content = $content -replace "#\s*import\s+site", "import site"
-        [System.IO.File]::WriteAllText($pth.FullName, $content)
-    }
-}
-function Add-SitePackagesToPth {
-    param($EmbedDir)
-    $pth = Get-ChildItem (Join-Path $EmbedDir "*.pth") -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($pth) {
-        $content = Get-Content $pth.FullName -Raw -Encoding UTF8
-        if ($content -notmatch "Lib[/\\]site-packages") {
-            $content = $content.TrimEnd() + "`r`nLib\site-packages`r`n"
-            [System.IO.File]::WriteAllText($pth.FullName, $content)
-        }
-    }
+
+function Find-PythonExe {
+    $dir = $InstallDir
+    if (-not (Test-Path $dir)) { return $null }
+    $exe = Get-ChildItem -Path $dir -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exe) { return $exe.FullName }
+    return $null
 }
 
-# 1) Use existing .python_embed or download
-if (-not (Test-Path $PythonExe)) {
-    Log "[1/5] Downloading Python (one-time, ~25MB)..."
-    $zipPath = Join-Path $ProjectRoot "python_embed.zip"
+$PythonExe = Find-PythonExe
+
+# 1) Install Python with official installer if not present
+if (-not $PythonExe) {
+    Log "[1/5] Downloading Python installer (~25MB)..."
+    $installerPath = Join-Path $ProjectRoot "python_installer.exe"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri $PythonEmbedUrl -OutFile $zipPath -UseBasicParsing
+        Invoke-WebRequest -Uri $PythonInstallerUrl -OutFile $installerPath -UseBasicParsing
     } catch {
-        Log "Download failed. Check internet. URL: $PythonEmbedUrl"
+        Log "Download failed. Check internet."
         Read-Host "Press Enter to exit"
         exit 1
     }
-    Expand-Archive -Path $zipPath -DestinationPath $EmbedDir -Force
-    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 
-    # Enable site for pip (uncomment "import site" in .pth)
-    Fix-EmbedPth -EmbedDir $EmbedDir
+    Log "[2/5] Installing Python (pip included). A window may appear..."
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    $proc = Start-Process -FilePath $installerPath -ArgumentList "/passive", "InstallAllUsers=0", "PrependPath=0", "TargetDir=$InstallDir" -Wait -PassThru
+    Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
 
-    Log "[2/5] Installing pip..."
-    $getPip = Join-Path $ProjectRoot "get_pip.py"
-    Invoke-WebRequest -Uri $GetPipUrl -OutFile $getPip -UseBasicParsing
-    & $PythonExe $getPip --no-warn-script-location
-    Remove-Item $getPip -Force -ErrorAction SilentlyContinue
-    Add-SitePackagesToPth -EmbedDir $EmbedDir
+    if ($proc.ExitCode -ne 0) {
+        Log "Python installer failed (exit code $($proc.ExitCode))."
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+
+    $PythonExe = Find-PythonExe
+    if (-not $PythonExe) {
+        Log "Python not found in $InstallDir. Try installing Python from python.org and run build.bat instead."
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+    Log "Python installed: $PythonExe"
 } else {
-    Log "[1/5] Using existing .python_embed"
+    Log "[1/5] Using existing Python: $PythonExe"
 }
 
-# Ensure pip is available: fix .pth and run get_pip if needed
-$pipOk = (Test-Path $PipExe)
-if (-not $pipOk) {
-    try { $null = & $PythonExe -m pip --version 2>&1; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
-}
-if (-not $pipOk) {
-    Log "[2/5] Installing pip..."
-    Fix-EmbedPth -EmbedDir $EmbedDir
-    $getPip = Join-Path $ProjectRoot "get_pip.py"
-    Invoke-WebRequest -Uri $GetPipUrl -OutFile $getPip -UseBasicParsing
-    & $PythonExe $getPip --no-warn-script-location
-    Remove-Item $getPip -Force -ErrorAction SilentlyContinue
-    # Add Lib\site-packages to .pth so "python -m pip" finds pip without relying on import site
-    Add-SitePackagesToPth -EmbedDir $EmbedDir
-    $pipOk = (Test-Path $PipExe)
-    if (-not $pipOk) { $pipOk = ($LASTEXITCODE -eq 0) }
-    if (-not $pipOk) {
-        Log "pip still missing. Delete .python_embed folder and run again."
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
-}
-
-# 2) Install dependencies (set PYTHONPATH so python finds pip in Lib\site-packages)
+# 2) Install dependencies
 Log "[3/5] Installing packages..."
-$SitePackages = Join-Path $EmbedDir "Lib\site-packages"
-if (-not (Test-Path $SitePackages)) {
-    Log "Lib\site-packages not found. Delete .python_embed and run again."
-    Read-Host "Press Enter to exit"
-    exit 1
-}
-$env:PATH = "$EmbedDir;$EmbedDir\Scripts;$env:PATH"
-$env:PYTHONPATH = $SitePackages
 & $PythonExe -m pip install -r requirements.txt -q
 if ($LASTEXITCODE -ne 0) {
     Log "pip install failed."
@@ -105,7 +68,6 @@ if ($LASTEXITCODE -ne 0) {
 Log "[4/5] Installing Chromium for Playwright..."
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $ProjectRoot "playwright_browsers"
 New-Item -ItemType Directory -Force -Path $env:PLAYWRIGHT_BROWSERS_PATH | Out-Null
-$env:PYTHONPATH = $SitePackages
 & $PythonExe -m playwright install chromium
 if ($LASTEXITCODE -ne 0) {
     Log "Playwright Chromium install failed."
@@ -115,7 +77,6 @@ if ($LASTEXITCODE -ne 0) {
 
 # 4) PyInstaller + build
 Log "[5/5] Building exe (this may take a few minutes)..."
-$env:PYTHONPATH = $SitePackages
 & $PythonExe -m pip install pyinstaller -q
 & $PythonExe -m PyInstaller --noconfirm app.spec 2>&1
 if ($LASTEXITCODE -ne 0) {
@@ -126,9 +87,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $distDir = Join-Path $ProjectRoot "dist\MarketingSolution"
 if (-not (Test-Path $distDir)) {
-    Log "WARNING: dist\MarketingSolution not found. Listing dist folder:"
-    $distRoot = Join-Path $ProjectRoot "dist"
-    if (Test-Path $distRoot) { Get-ChildItem $distRoot } else { Log "dist folder does not exist." }
+    Log "WARNING: dist\MarketingSolution not found."
+    if (Test-Path (Join-Path $ProjectRoot "dist")) { Get-ChildItem (Join-Path $ProjectRoot "dist") }
     Read-Host "Press Enter to exit"
     exit 1
 }
