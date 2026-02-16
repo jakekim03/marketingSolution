@@ -44,6 +44,31 @@ if (-not (Test-Path $PythonExe)) {
     Log "[1/5] Using existing .python_embed"
 }
 
+# Ensure pip is available (fix .pth + get_pip if needed)
+$pipOk = $false
+try {
+    $null = & $PythonExe -m pip --version 2>&1
+    if ($LASTEXITCODE -eq 0) { $pipOk = $true }
+} catch {}
+if (-not $pipOk) {
+    Log "[2/5] Installing pip (was missing in .python_embed)..."
+    $pth = Get-ChildItem (Join-Path $EmbedDir "python*.pth") -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($pth) {
+        $content = Get-Content $pth.FullName -Raw
+        $content = $content -replace "#import site", "import site"
+        Set-Content $pth.FullName -Value $content -NoNewline
+    }
+    $getPip = Join-Path $ProjectRoot "get_pip.py"
+    Invoke-WebRequest -Uri $GetPipUrl -OutFile $getPip -UseBasicParsing
+    & $PythonExe $getPip --no-warn-script-location
+    Remove-Item $getPip -Force -ErrorAction SilentlyContinue
+    if ($LASTEXITCODE -ne 0) {
+        Log "get_pip failed. Try deleting the .python_embed folder and running again."
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+}
+
 # 2) Install dependencies
 Log "[3/5] Installing packages..."
 $env:PATH = "$EmbedDir;$EmbedDir\Scripts;$env:PATH"
