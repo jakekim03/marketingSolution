@@ -9,8 +9,18 @@ $PythonEmbedUrl = "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-
 $GetPipUrl = "https://bootstrap.pypa.io/get-pip.py"
 $EmbedDir = Join-Path $ProjectRoot ".python_embed"
 $PythonExe = Join-Path $EmbedDir "python.exe"
+$PipExe = Join-Path $EmbedDir "Scripts\pip.exe"
 
 function Log { param($msg) Write-Host $msg }
+function Fix-EmbedPth {
+    param($EmbedDir)
+    $pth = Get-ChildItem (Join-Path $EmbedDir "*.pth") -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($pth) {
+        $content = Get-Content $pth.FullName -Raw -Encoding UTF8
+        $content = $content -replace "#\s*import\s+site", "import site"
+        [System.IO.File]::WriteAllText($pth.FullName, $content)
+    }
+}
 
 # 1) Use existing .python_embed or download
 if (-not (Test-Path $PythonExe)) {
@@ -27,13 +37,8 @@ if (-not (Test-Path $PythonExe)) {
     Expand-Archive -Path $zipPath -DestinationPath $EmbedDir -Force
     Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 
-    # Enable site for pip
-    $pth = Get-ChildItem (Join-Path $EmbedDir "python*.pth") | Select-Object -First 1
-    if ($pth) {
-        $content = Get-Content $pth.FullName -Raw
-        $content = $content -replace "#import site", "import site"
-        Set-Content $pth.FullName -Value $content -NoNewline
-    }
+    # Enable site for pip (uncomment "import site" in .pth)
+    Fix-EmbedPth -EmbedDir $EmbedDir
 
     Log "[2/5] Installing pip..."
     $getPip = Join-Path $ProjectRoot "get_pip.py"
@@ -44,35 +49,34 @@ if (-not (Test-Path $PythonExe)) {
     Log "[1/5] Using existing .python_embed"
 }
 
-# Ensure pip is available (fix .pth + get_pip if needed)
-$pipOk = $false
-try {
-    $null = & $PythonExe -m pip --version 2>&1
-    if ($LASTEXITCODE -eq 0) { $pipOk = $true }
-} catch {}
+# Ensure pip is available: fix .pth and run get_pip if needed
+$pipOk = (Test-Path $PipExe)
 if (-not $pipOk) {
-    Log "[2/5] Installing pip (was missing in .python_embed)..."
-    $pth = Get-ChildItem (Join-Path $EmbedDir "python*.pth") -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($pth) {
-        $content = Get-Content $pth.FullName -Raw
-        $content = $content -replace "#import site", "import site"
-        Set-Content $pth.FullName -Value $content -NoNewline
-    }
+    try { $null = & $PythonExe -m pip --version 2>&1; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
+}
+if (-not $pipOk) {
+    Log "[2/5] Installing pip..."
+    Fix-EmbedPth -EmbedDir $EmbedDir
     $getPip = Join-Path $ProjectRoot "get_pip.py"
     Invoke-WebRequest -Uri $GetPipUrl -OutFile $getPip -UseBasicParsing
     & $PythonExe $getPip --no-warn-script-location
     Remove-Item $getPip -Force -ErrorAction SilentlyContinue
-    if ($LASTEXITCODE -ne 0) {
-        Log "get_pip failed. Try deleting the .python_embed folder and running again."
+    $pipOk = (Test-Path $PipExe)
+    if (-not $pipOk) {
+        Log "pip still missing. Delete .python_embed folder and run again."
         Read-Host "Press Enter to exit"
         exit 1
     }
 }
 
-# 2) Install dependencies
+# 2) Install dependencies (use pip.exe directly so "python -m pip" is not needed)
 Log "[3/5] Installing packages..."
 $env:PATH = "$EmbedDir;$EmbedDir\Scripts;$env:PATH"
-& $PythonExe -m pip install -r requirements.txt -q
+if (Test-Path $PipExe) {
+    & $PipExe install -r requirements.txt -q
+} else {
+    & $PythonExe -m pip install -r requirements.txt -q
+}
 if ($LASTEXITCODE -ne 0) {
     Log "pip install failed."
     Read-Host "Press Enter to exit"
@@ -92,7 +96,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # 4) PyInstaller + build
 Log "[5/5] Building exe (this may take a few minutes)..."
-& $PythonExe -m pip install pyinstaller -q
+if (Test-Path $PipExe) { & $PipExe install pyinstaller -q } else { & $PythonExe -m pip install pyinstaller -q }
 & $PythonExe -m PyInstaller --noconfirm app.spec 2>&1
 if ($LASTEXITCODE -ne 0) {
     Log "PyInstaller failed. Check errors above."
