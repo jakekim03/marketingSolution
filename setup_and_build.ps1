@@ -84,12 +84,16 @@ if (-not $pipOk) {
     }
 }
 
-# After get_pip, ensure .pth has Lib\site-packages so python -m pip works
-Add-SitePackagesToPth -EmbedDir $EmbedDir
-
-# 2) Install dependencies
+# 2) Install dependencies (set PYTHONPATH so python finds pip in Lib\site-packages)
 Log "[3/5] Installing packages..."
+$SitePackages = Join-Path $EmbedDir "Lib\site-packages"
+if (-not (Test-Path $SitePackages)) {
+    Log "Lib\site-packages not found. Delete .python_embed and run again."
+    Read-Host "Press Enter to exit"
+    exit 1
+}
 $env:PATH = "$EmbedDir;$EmbedDir\Scripts;$env:PATH"
+$env:PYTHONPATH = $SitePackages
 & $PythonExe -m pip install -r requirements.txt -q
 if ($LASTEXITCODE -ne 0) {
     Log "pip install failed."
@@ -101,6 +105,7 @@ if ($LASTEXITCODE -ne 0) {
 Log "[4/5] Installing Chromium for Playwright..."
 $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $ProjectRoot "playwright_browsers"
 New-Item -ItemType Directory -Force -Path $env:PLAYWRIGHT_BROWSERS_PATH | Out-Null
+$env:PYTHONPATH = $SitePackages
 & $PythonExe -m playwright install chromium
 if ($LASTEXITCODE -ne 0) {
     Log "Playwright Chromium install failed."
@@ -110,6 +115,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # 4) PyInstaller + build
 Log "[5/5] Building exe (this may take a few minutes)..."
+$env:PYTHONPATH = $SitePackages
 & $PythonExe -m pip install pyinstaller -q
 & $PythonExe -m PyInstaller --noconfirm app.spec 2>&1
 if ($LASTEXITCODE -ne 0) {
