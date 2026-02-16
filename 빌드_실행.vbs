@@ -1,3 +1,4 @@
+Set fso = CreateObject("Scripting.FileSystemObject")
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.CurrentDirectory = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
-WshShell.Run "cmd /k ""빌드.bat""", 1, False
+folder = fso.GetParentFolderName(WScript.ScriptFullName)
+WshShell.Run "cmd /k ""cd /d " & Chr(34) & folder & Chr(34) & " && build.bat""", 1, False
