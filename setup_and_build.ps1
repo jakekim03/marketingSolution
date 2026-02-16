@@ -10,11 +10,23 @@ $InstallDir = Join-Path $ProjectRoot ".python_install"
 
 function Log { param($msg) Write-Host $msg }
 
+# Default "Just for me" install path (no TargetDir - installer uses this)
+$DefaultPythonPath = Join-Path $env:LocalAppData "Programs\Python\Python311\python.exe"
+
 function Find-PythonExe {
-    $dir = $InstallDir
-    if (-not (Test-Path $dir)) { return $null }
-    $exe = Get-ChildItem -Path $dir -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($exe) { return $exe.FullName }
+    # 1) Check project folder (TargetDir)
+    if (Test-Path $InstallDir) {
+        $exe = Get-ChildItem -Path $InstallDir -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($exe) { return $exe.FullName }
+    }
+    # 2) Check default install location (AppData)
+    if (Test-Path $DefaultPythonPath) { return $DefaultPythonPath }
+    # 3) Any Python311 in LocalAppData
+    $progs = Join-Path $env:LocalAppData "Programs\Python"
+    if (Test-Path $progs) {
+        $exe = Get-ChildItem -Path $progs -Filter "python.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($exe) { return $exe.FullName }
+    }
     return $null
 }
 
@@ -33,9 +45,9 @@ if (-not $PythonExe) {
         exit 1
     }
 
-    Log "[2/5] Installing Python (pip included). A window may appear..."
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    $proc = Start-Process -FilePath $installerPath -ArgumentList "/passive", "InstallAllUsers=0", "PrependPath=0", "TargetDir=$InstallDir" -Wait -PassThru
+    Log "[2/5] Installing Python (pip included). A window may appear - wait until it closes..."
+    # Install to default location (AppData). TargetDir with path containing spaces/(1) can fail.
+    $proc = Start-Process -FilePath $installerPath -ArgumentList "/passive", "InstallAllUsers=0", "PrependPath=0" -Wait -PassThru
     Remove-Item $installerPath -Force -ErrorAction SilentlyContinue
 
     if ($proc.ExitCode -ne 0) {
@@ -44,9 +56,10 @@ if (-not $PythonExe) {
         exit 1
     }
 
+    Start-Sleep -Seconds 2
     $PythonExe = Find-PythonExe
     if (-not $PythonExe) {
-        Log "Python not found in $InstallDir. Try installing Python from python.org and run build.bat instead."
+        Log "Python not found after install. Check: $DefaultPythonPath"
         Read-Host "Press Enter to exit"
         exit 1
     }
