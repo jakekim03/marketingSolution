@@ -3,6 +3,7 @@
 .venv/
 venv/
 env/
+.python_embed/
 
 # Python
 __pycache__/

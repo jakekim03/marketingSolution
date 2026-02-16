@@ -1,10 +1,9 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
 
-echo [1/3] 가상환경 확인...
+echo [1/3] Checking .venv...
 if not exist ".venv\Scripts\activate.bat" (
-  echo .venv이 없습니다. 먼저 다음을 실행하세요:
+  echo ERROR: .venv not found. Run these in cmd first:
   echo   python -m venv .venv
   echo   .venv\Scripts\activate
   echo   pip install -r requirements.txt
@@ -14,33 +13,33 @@ if not exist ".venv\Scripts\activate.bat" (
 )
 call .venv\Scripts\activate.bat
 
-echo [2/3] Chromium을 playwright_browsers 폴더에 설치...
+echo [2/3] Installing Chromium to playwright_browsers...
 set PLAYWRIGHT_BROWSERS_PATH=%~dp0playwright_browsers
-if not exist "playwright_browsers" mkdir playwright_browsers
+if not exist "playwright_browsers" mkdir "playwright_browsers"
 playwright install chromium
 if errorlevel 1 (
-  echo Chromium 설치 실패. 수동: set PLAYWRIGHT_BROWSERS_PATH=%~dp0playwright_browsers ^& playwright install chromium
+  echo ERROR: Chromium install failed.
   pause
   exit /b 1
 )
 
-echo [3/3] PyInstaller로 exe 빌드...
+echo [3/3] Building exe with PyInstaller...
 pip install pyinstaller --quiet
 pyinstaller --noconfirm app.spec
 if errorlevel 1 (
-  echo 빌드 실패.
+  echo ERROR: Build failed.
   pause
   exit /b 1
 )
 
-copy /Y "%~dp0사용방법_배포용.txt" "dist\법인영업솔루션\사용방법.txt" >nul 2>&1
+if exist "사용방법_배포용.txt" (
+  copy /Y "%~dp0사용방법_배포용.txt" "dist\법인영업솔루션\사용방법.txt" >nul 2>&1
+)
+
 echo.
-echo ====== 완료 ======
+echo ====== Done ======
 echo.
-echo  [보낼 것]  dist\법인영업솔루션  폴더 전체를 ZIP으로 압축
-echo             (또는 폴더를 그대로 전달)
-echo.
-echo  [받는 사람]  ZIP 압축 해제 후 "법인영업솔루션.exe" 더블클릭
-echo               (Python 등 설치 필요 없음)
+echo  Output folder: dist\법인영업솔루션
+echo  Zip that folder and send it. User runs 법인영업솔루션.exe
 echo.
 pause
