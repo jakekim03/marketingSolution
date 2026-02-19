@@ -7,6 +7,7 @@ exe로 실행 시: ROOT = exe 있는 폴더, Chromium은 playwright_browsers 폴
 """
 import os
 import queue
+import subprocess
 import sys
 import threading
 import time
@@ -17,10 +18,50 @@ from pathlib import Path
 from flask import Flask, request, url_for, send_file, jsonify, redirect
 from openpyxl import Workbook
 
-# exe(빌드)로 실행 중이면 exe 있는 폴더를 루트로, Playwright 브라우저도 그 폴더 기준
+# exe(빌드)로 실행 중이면 exe 있는 폴더를 루트로. PyInstaller 6+는 데이터를 _internal 에 넣음
 if getattr(sys, "frozen", False):
-    ROOT = Path(sys.executable).resolve().parent
+    _exe_dir = Path(sys.executable).resolve().parent
+    _internal = _exe_dir / "_internal"
+    ROOT = _internal if _internal.is_dir() else _exe_dir
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(ROOT / "playwright_browsers")
+
+    def _ensure_browser_executable():
+        """번들에서 추출된 Chromium 실행 가능하도록: 권한 부여, macOS 격리 제거·서명."""
+        browsers_dir = ROOT / "playwright_browsers"
+        if not browsers_dir.is_dir():
+            return
+        for d in browsers_dir.iterdir():
+            if not d.is_dir() or not d.name.startswith("chromium-"):
+                continue
+            # 모든 파일/디렉터리에 실행(탐색) 권한 부여
+            for f in d.rglob("*"):
+                try:
+                    mode = f.stat().st_mode
+                    os.chmod(f, mode | (0o111 if f.is_file() else 0o111))
+                except OSError:
+                    pass
+            # macOS: 격리 속성 제거 (다운로드 등으로 실행 차단되는 것 방지)
+            if sys.platform == "darwin":
+                try:
+                    subprocess.run(
+                        ["xattr", "-cr", str(d)],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                    pass
+                # Chromium.app ad-hoc 서명 (서명 없으면 spawn EACCES 발생할 수 있음)
+                chromium_app = d / "chrome-mac" / "Chromium.app"
+                if chromium_app.is_dir():
+                    try:
+                        subprocess.run(
+                            ["codesign", "--force", "--deep", "--sign", "-", str(chromium_app)],
+                            capture_output=True,
+                            timeout=60,
+                        )
+                    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                        pass
+    _ensure_browser_executable()
 else:
     ROOT = Path(__file__).resolve().parent
 os.chdir(ROOT)
